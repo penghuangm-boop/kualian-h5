@@ -1,0 +1,15 @@
+.DS_Store
+
+# Local runtime data
+data/
+
+# Source design/prototype materials, not needed for deployment repo
+design/
+yuanxing/
+audit/
+design-qa.md
+
+# Local dependency/cache folders
+node_modules/
+.env
+.env.*

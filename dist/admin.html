@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fff7fb">
+  <title>垮脸自救实验室后台管理</title>
+  <link rel="stylesheet" href="./admin.css?v=20260618-1">
+</head>
+<body>
+  <div class="admin-shell">
+    <aside class="admin-sidebar">
+      <div class="admin-brand">
+        <img src="./assets/icons/logo-flask.png" alt="">
+        <div>
+          <strong>垮脸自救实验室</strong>
+          <span>后台管理 MVP</span>
+        </div>
+      </div>
+      <nav class="admin-nav" aria-label="后台模块">
+        <button class="active" type="button" data-panel="overview">数据概览</button>
+        <button type="button" data-panel="users">用户报告</button>
+        <button type="button" data-panel="members">用户管理</button>
+        <button type="button" data-panel="questions">问卷题库</button>
+        <button type="button" data-panel="rules">报告配置</button>
+        <button type="button" data-panel="content">页面文案</button>
+      </nav>
+      <p class="admin-note">当前为前端后台原型，读取同域浏览器本地演示数据。</p>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-topbar">
+        <div>
+          <span class="admin-eyebrow">Operation Console</span>
+          <h1 id="panelTitle">数据概览</h1>
+        </div>
+        <div class="admin-actions">
+          <a class="ghost-action" href="./index.html#home">打开 H5</a>
+          <button class="ghost-action" type="button" id="refreshData">刷新数据</button>
+          <button class="ghost-action" type="button" id="exportMembersCsv">导出用户CSV</button>
+          <button class="ghost-action" type="button" id="exportReportsCsv">导出报告CSV</button>
+          <button class="primary-action" type="button" id="exportConfig">导出配置</button>
+        </div>
+      </header>
+
+      <section class="admin-panel active" data-panel-view="overview">
+        <div class="kpi-grid" id="kpiGrid"></div>
+        <div class="admin-grid two-cols">
+          <section class="admin-card">
+            <div class="card-title">
+              <h2>最近 7 天测评趋势</h2>
+              <span>演示数据</span>
+            </div>
+            <div class="trend-chart" id="trendChart"></div>
+          </section>
+          <section class="admin-card">
+            <div class="card-title">
+              <h2>上镜状态类型分布</h2>
+              <span>问卷结果</span>
+            </div>
+            <div class="distribution-list" id="distributionList"></div>
+          </section>
+        </div>
+        <section class="admin-card">
+          <div class="card-title">
+            <h2>待关注事项</h2>
+            <span>运营提醒</span>
+          </div>
+          <div class="todo-list" id="todoList"></div>
+        </section>
+      </section>
+
+      <section class="admin-panel" data-panel-view="users">
+        <section class="admin-card report-filter-card">
+          <div class="card-title">
+            <div>
+              <h2>用户报告管理</h2>
+              <p>筛选用户报告，查看问卷、照片辅助、打卡进度和运营备注。</p>
+            </div>
+            <button class="ghost-action compact" type="button" id="resetUserFilters">重置筛选</button>
+          </div>
+          <div class="report-filters" id="reportFilters">
+            <label>
+              <span>垮脸类型</span>
+              <select id="filterType">
+                <option value="all">全部类型</option>
+              </select>
+            </label>
+            <label>
+              <span>照片辅助</span>
+              <select id="filterPhoto">
+                <option value="all">全部</option>
+                <option value="已补充">已补充</option>
+                <option value="未补充">未补充</option>
+              </select>
+            </label>
+            <label>
+              <span>登录保存</span>
+              <select id="filterSaved">
+                <option value="all">全部</option>
+                <option value="已登录">已登录</option>
+                <option value="未登录">未登录</option>
+              </select>
+            </label>
+            <label>
+              <span>7 天进度</span>
+              <select id="filterProgress">
+                <option value="all">全部</option>
+                <option value="active">已开始</option>
+                <option value="none">未开始</option>
+                <option value="done">已完成</option>
+              </select>
+            </label>
+          </div>
+        </section>
+        <div class="user-report-layout">
+          <section class="admin-card">
+            <div class="card-title">
+              <h2>用户报告列表</h2>
+              <span id="userCountLabel">包含本机演示用户</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>用户</th>
+                    <th>状态类型</th>
+                    <th>照片辅助</th>
+                    <th>登录保存</th>
+                    <th>7 天进度</th>
+                    <th>运营状态</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="userTable"></tbody>
+              </table>
+            </div>
+          </section>
+          <aside class="admin-card report-detail-card" id="reportDetail" aria-live="polite"></aside>
+        </div>
+      </section>
+
+      <section class="admin-panel" data-panel-view="members">
+        <section class="admin-card member-filter-card">
+          <div class="card-title">
+            <div>
+              <h2>用户检索</h2>
+              <p>按昵称、用户 ID 或 OpenID 查找用户，并快速定位是否已经生成报告。</p>
+            </div>
+            <button class="ghost-action compact" type="button" id="resetMemberFilters">重置检索</button>
+          </div>
+          <div class="report-filters member-filters" id="memberFilters">
+            <label>
+              <span>关键词</span>
+              <input id="memberSearch" placeholder="昵称 / 用户 ID / OpenID">
+            </label>
+            <label>
+              <span>报告状态</span>
+              <select id="memberReportFilter">
+                <option value="all">全部用户</option>
+                <option value="withReport">已有报告</option>
+                <option value="noReport">暂无报告</option>
+              </select>
+            </label>
+            <label>
+              <span>运营阶段</span>
+              <select id="memberStageFilter">
+                <option value="all">全部阶段</option>
+                <option value="new">新用户</option>
+                <option value="priority">重点跟进</option>
+                <option value="photo">待补照片</option>
+                <option value="high">高意向</option>
+                <option value="contacted">已联系</option>
+              </select>
+            </label>
+          </div>
+        </section>
+        <div class="member-layout">
+          <section class="admin-card">
+            <div class="card-title">
+              <div>
+                <h2>用户列表</h2>
+                <p>来自 H5 模拟登录的真实本地用户，报告会绑定到用户 ID。</p>
+              </div>
+              <span id="memberCountLabel">等待 API 数据</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>用户</th>
+                    <th>登录方式</th>
+                    <th>运营阶段</th>
+                    <th>报告数</th>
+                    <th>最近报告</th>
+                    <th>创建时间</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="memberTable"></tbody>
+              </table>
+            </div>
+          </section>
+          <aside class="admin-card member-detail-card" id="memberDetail" aria-live="polite"></aside>
+        </div>
+      </section>
+
+      <section class="admin-panel" data-panel-view="questions">
+        <section class="admin-card">
+          <div class="card-title">
+            <div>
+              <h2>问卷题库</h2>
+              <p>配置 H5 测评题目、选项文案和归因类型。保存后前台会读取最新题库。</p>
+            </div>
+            <div class="card-actions">
+              <button class="ghost-action compact" type="button" data-reset-questions>恢复默认</button>
+              <button class="primary-action compact" type="button" data-save-questions>保存题库</button>
+            </div>
+          </div>
+          <div class="question-list" id="questionList"></div>
+        </section>
+      </section>
+
+      <section class="admin-panel" data-panel-view="rules">
+        <section class="admin-card type-config-card">
+          <div class="card-title">
+            <div>
+              <h2>用户垮脸类型参数配置</h2>
+              <p>后台内置 6 种垮脸类型，可配置判定阈值、题目权重、等级标签和推荐方向。</p>
+            </div>
+            <button class="ghost-action compact" type="button" data-save-types>保存类型参数</button>
+          </div>
+          <div class="type-config-grid" id="collapseTypeConfig"></div>
+        </section>
+        <div class="admin-grid two-cols">
+          <section class="admin-card">
+            <div class="card-title">
+              <h2>报告规则</h2>
+              <span>问卷版</span>
+            </div>
+            <div class="rule-list" id="reportRules"></div>
+          </section>
+          <section class="admin-card">
+            <div class="card-title">
+              <h2>照片辅助规则</h2>
+              <span>MVP 粗评</span>
+            </div>
+            <div class="rule-list" id="photoRules"></div>
+          </section>
+        </div>
+        <section class="admin-card">
+          <div class="card-title">
+            <h2>关键流程开关</h2>
+            <span>当前逻辑</span>
+          </div>
+          <div class="switch-grid" id="flowSwitches"></div>
+        </section>
+      </section>
+
+      <section class="admin-panel" data-panel-view="content">
+        <section class="admin-card report-content-card">
+          <div class="card-title">
+            <div>
+              <h2>报告内容配置</h2>
+              <p>按垮脸类型配置报告说明、主要影响因素、今日建议和 7 天计划，前台报告会读取这里保存的内容。</p>
+            </div>
+            <button class="ghost-action compact" type="button" data-save-content>保存报告内容</button>
+          </div>
+          <div class="content-toolbar">
+            <label>
+              <span>选择垮脸类型</span>
+              <select id="contentTypeSelect" aria-label="选择垮脸类型"></select>
+            </label>
+          </div>
+          <div class="content-editor" id="contentEditor"></div>
+        </section>
+        <div class="admin-grid two-cols">
+          <section class="admin-card">
+            <div class="card-title">
+              <h2>首页文案</h2>
+              <span>可运营调整</span>
+            </div>
+            <label class="field">
+              <span>主标题</span>
+              <input value="测出你的上镜显垮类型">
+            </label>
+            <label class="field">
+              <span>副文案</span>
+              <textarea rows="4">结合休息、姿态、妆造与拍照习惯，生成一份可解释的上镜状态分析。</textarea>
+            </label>
+            <button class="primary-action wide" type="button" data-save-demo>保存文案</button>
+          </section>
+          <section class="admin-card">
+            <div class="card-title">
+              <h2>照片页文案</h2>
+              <span>上传说明</span>
+            </div>
+            <label class="field">
+              <span>标题</span>
+              <input value="补充照片后，分析会更真实">
+            </label>
+            <label class="field">
+              <span>说明</span>
+              <textarea rows="4">请按同一光线环境拍摄，避免重滤镜与夸张表情。照片仅用于本次上镜状态分析。</textarea>
+            </label>
+            <button class="primary-action wide" type="button" data-save-demo>保存文案</button>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="admin-toast" id="adminToast" role="status" aria-live="polite"></div>
+  <script src="./config.js?v=20260618-1"></script>
+  <script src="./admin.js?v=20260618-1"></script>
+</body>
+</html>

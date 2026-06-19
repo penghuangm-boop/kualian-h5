@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fff7fb">
+  <meta name="description" content="垮脸自救实验室：问卷为主、照片辅助的上镜状态管理 H5。">
+  <title>垮脸自救实验室</title>
+    <link rel="stylesheet" href="./styles.css?v=20260612-16">
+</head>
+<body>
+  <div class="app-shell">
+    <main class="app" id="app">
+      <section class="screen active" data-screen="home" aria-labelledby="homeTitle">
+        <header class="brand-bar">
+          <div class="brand">
+            <img src="./assets/icons/logo-flask.png" alt="" class="brand-logo">
+            <div>
+              <strong>垮脸自救实验室</strong>
+              <span>上镜状态管理</span>
+            </div>
+          </div>
+          <button class="text-button" type="button" data-open="about">说明</button>
+        </header>
+
+        <div id="homeFirst">
+          <section class="hero">
+            <div class="hero-copy">
+              <span class="eyebrow">3 分钟上镜状态测评</span>
+              <h1 id="homeTitle">测出你的<br><em>上镜显垮类型</em></h1>
+              <p>结合休息、姿态、妆造与拍照习惯，生成一份可解释的上镜状态分析。</p>
+              <div class="hero-actions">
+                <button class="button primary" type="button" data-go="quiz">开始状态测评</button>
+                <button class="button secondary" type="button" data-go="urgent">明天有重要场合</button>
+              </div>
+            </div>
+            <div class="hero-photo" aria-hidden="true">
+              <img src="./assets/images/hero-woman.jpg" alt="">
+            </div>
+          </section>
+
+          <section class="card archive-card">
+            <span class="eyebrow archive-label">
+              <img src="./assets/icons/archive-heart.png" alt="">
+              上镜状态档案
+            </span>
+            <h2>你的脸为什么一上镜就显累？</h2>
+            <p>完成测评后获得状态类型、主要影响因素和当天可以执行的建议。</p>
+            <div class="feature-grid">
+              <article>
+                <img src="./assets/icons/feature-score.png" alt="">
+                <b>状态等级</b>
+                <span>问卷生成</span>
+              </article>
+              <article>
+                <img src="./assets/icons/feature-reason.png" alt="">
+                <b>影响因素</b>
+                <span>可解释</span>
+              </article>
+              <article>
+                <img src="./assets/icons/feature-advice.png" alt="">
+                <b>上镜建议</b>
+                <span>专属匹配</span>
+              </article>
+            </div>
+            <button class="button wechat" type="button" data-login>微信登录并保存状态档案</button>
+            <small class="privacy-line">MVP 演示登录，不会连接真实微信账户</small>
+          </section>
+        </div>
+
+        <div id="homeReturn" hidden>
+          <section class="card return-card">
+            <div class="return-head">
+              <img src="./assets/images/hero-woman.jpg" alt="" class="avatar-image">
+              <div>
+                <span class="eyebrow">欢迎回来</span>
+                <h1>你的状态档案已生成</h1>
+                <p>继续查看报告，或完成今天的上镜状态管理。</p>
+              </div>
+            </div>
+            <div class="chip-row" id="homeChips"></div>
+            <div class="today-panel">
+              <b id="homeDayTitle">7 天自救打卡 · Day 1 / 7</b>
+              <span id="homeDayDesc">今天完成 3 个轻量任务，不追求用力过猛。</span>
+            </div>
+            <button class="button primary" type="button" data-go="checkin">继续 7 天自救打卡</button>
+            <div class="button-pair">
+              <button class="button secondary" type="button" data-go="report">查看完整报告</button>
+              <button class="button secondary" type="button" data-go="urgent">重要场合急救</button>
+            </div>
+          </section>
+          <section class="card history-card" id="homeHistoryCard" hidden>
+            <div class="section-title">
+              <h2>我的历史报告</h2>
+              <span id="historyCount">登录后同步</span>
+            </div>
+            <div class="history-list" id="homeHistoryList"></div>
+          </section>
+          <section class="metric-grid" id="homeMetrics"></section>
+        </div>
+      </section>
+
+      <section class="screen" data-screen="quiz" aria-labelledby="quizTitle">
+        <header class="page-header">
+          <button class="text-button" type="button" data-back>返回</button>
+          <div>
+            <h1 id="quizTitle">状态测评</h1>
+            <span id="quizStep">第 1 / 10 题</span>
+          </div>
+          <span id="quizPercent">10%</span>
+        </header>
+        <div class="progress-track"><i id="quizBar"></i></div>
+        <section class="card quiz-card">
+          <div class="question-title">
+            <span>Q</span>
+            <h2 id="questionText"></h2>
+          </div>
+          <div class="answer-grid" id="answerGrid"></div>
+        </section>
+        <section class="card supplement-card">
+          <div class="section-title">
+            <h2>补充信息</h2>
+            <span>可多选</span>
+          </div>
+          <div class="supplement-grid" id="supplementGrid"></div>
+        </section>
+        <div class="sticky-actions">
+          <button class="button secondary" type="button" id="quizPrev">上一题</button>
+          <button class="button primary" type="button" id="quizNext">下一题</button>
+        </div>
+      </section>
+
+      <section class="screen" data-screen="resultGate" aria-labelledby="gateTitle">
+        <header class="page-header simple">
+          <button class="text-button" type="button" data-back>返回</button>
+          <h1 id="gateTitle">测评完成</h1>
+          <span></span>
+        </header>
+        <section class="card gate-card">
+          <img src="./assets/icons/feature-score.png" alt="">
+          <span class="eyebrow">问卷版结果已生成</span>
+          <h2>先看核心结论，再决定是否保存</h2>
+          <p>登录用于跨页面保存报告和 7 天进度。照片辅助是可选项，不会挡住问卷版报告。</p>
+          <button class="button primary" type="button" id="previewReport">查看问卷版报告</button>
+          <button class="button wechat" type="button" data-login>微信登录并保存</button>
+        </section>
+        <section class="card mini-preview">
+          <h2>报告包含</h2>
+          <div class="feature-grid">
+            <article><img src="./assets/icons/feature-score.png" alt=""><b>状态类型</b></article>
+            <article><img src="./assets/icons/feature-reason.png" alt=""><b>主要因素</b></article>
+            <article><img src="./assets/icons/feature-advice.png" alt=""><b>当天建议</b></article>
+          </div>
+        </section>
+      </section>
+
+      <section class="screen" data-screen="photo" aria-labelledby="photoTitle">
+        <header class="page-header simple">
+          <button class="text-button icon-back" type="button" data-back aria-label="返回">返回</button>
+          <div>
+            <h1 id="photoTitle">照片增强分析</h1>
+            <span>上传3张照片，生成更贴近你的完整报告</span>
+          </div>
+          <span></span>
+        </header>
+        <section class="card photo-intro">
+          <div>
+            <span class="eyebrow photo-eyebrow">
+              <img src="./assets/photo-page/eyebrow-heart.png" alt="">
+              报告生成前的最后一步
+            </span>
+            <h2>补充照片后，分析会更真实</h2>
+            <p>请按同一光线环境拍摄，避免重滤镜与夸张表情。照片仅用于本次上镜状态分析。</p>
+          </div>
+          <img class="photo-intro-visual" src="./assets/photo-page/intro-clipboard.png" alt="">
+        </section>
+        <div class="upload-grid" id="uploadGrid"></div>
+        <p class="upload-note">原型演示中，点击照片卡片即可模拟上传。</p>
+        <section class="card capture-rules">
+          <h2>拍摄要求</h2>
+          <ul>
+            <li>
+              <img src="./assets/photo-page/rule-light.png" alt="">
+              <div><b>自然光或均匀光线</b><span>避免强阴影和过曝。</span></div>
+              <i aria-hidden="true">✓</i>
+            </li>
+            <li>
+              <img src="./assets/photo-page/rule-jaw.png" alt="">
+              <div><b>露出完整下颌线</b><span>头发不要遮挡脸颊与下颌。</span></div>
+              <i aria-hidden="true">✓</i>
+            </li>
+            <li>
+              <img src="./assets/photo-page/rule-filter.png" alt="">
+              <div><b>不使用重滤镜</b><span>保持真实肤色与轮廓。</span></div>
+              <i aria-hidden="true">✓</i>
+            </li>
+            <li>
+              <img src="./assets/photo-page/rule-lock.png" alt="">
+              <div><b>仅用于本次分析</b><span>不做人脸建档，不用于其他用途。</span></div>
+              <i aria-hidden="true">✓</i>
+            </li>
+          </ul>
+        </section>
+        <label class="consent-row">
+          <input type="checkbox" id="photoConsent" checked>
+          <span>我已阅读并同意 <b>《照片使用说明》</b></span>
+        </label>
+        <div class="photo-actions">
+          <button class="button primary" type="button" id="analyzePhotos">生成完整报告</button>
+          <button class="button secondary" type="button" data-go="report">暂不上传，查看问卷版报告</button>
+        </div>
+      </section>
+
+      <section class="screen" data-screen="report" aria-labelledby="reportTitle">
+        <header class="page-header simple">
+          <button class="text-button" type="button" data-back>返回</button>
+          <h1 id="reportTitle">个人分析报告</h1>
+          <button class="text-button accent" type="button" id="saveReport">保存</button>
+        </header>
+        <section class="report-hero">
+          <img src="./assets/images/hero-woman.jpg" alt="">
+          <div>
+            <span>你的上镜状态类型</span>
+            <h2 id="reportType">姿态疲惫型</h2>
+            <b id="reportLevel">轻度 · 建议调整</b>
+            <p id="reportBasis">根据问卷回答生成</p>
+            <button class="small-button" type="button" data-go="photo">补充照片辅助评估</button>
+          </div>
+        </section>
+        <section class="metric-grid" id="reportMetrics"></section>
+        <section class="card factor-card">
+          <div class="section-title"><h2>主要影响因素</h2><span>由高到低</span></div>
+          <div id="factorList"></div>
+        </section>
+        <section class="card advice-card">
+          <div class="section-title"><h2>今日快速建议</h2><span>轻量执行</span></div>
+          <div class="advice-grid" id="adviceGrid"></div>
+        </section>
+        <section class="card plan-cta">
+          <span class="eyebrow">根据你的报告生成</span>
+          <h2>加入我的 7 天状态管理</h2>
+          <p>把主要影响因素拆成每天 3 个可以执行的小任务。</p>
+          <button class="button primary" type="button" data-go="checkin">开始 7 天打卡</button>
+        </section>
+        <p class="medical-note">本报告仅用于上镜状态参考，不构成医疗或美容诊断。</p>
+      </section>
+
+      <section class="screen" data-screen="urgent" aria-labelledby="urgentTitle">
+        <header class="page-header simple">
+          <button class="text-button" type="button" data-back>返回</button>
+          <h1 id="urgentTitle">重要场合准备</h1>
+          <span></span>
+        </header>
+        <section class="urgent-hero">
+          <div>
+            <span class="eyebrow">24 小时上镜准备</span>
+            <h2>明天有重要场合？</h2>
+            <p>选择场景，先处理最影响上镜状态的三个细节。</p>
+          </div>
+          <img src="./assets/images/hero-woman.jpg" alt="">
+        </section>
+        <section class="card">
+          <div class="section-title"><h2>选择场景</h2><span>单选</span></div>
+          <div class="scenario-grid" id="scenarioGrid"></div>
+        </section>
+        <section class="card urgent-list-card">
+          <div class="section-title"><h2 id="scenarioTitle">约会准备建议</h2><span>3 项</span></div>
+          <div id="urgentList"></div>
+        </section>
+        <button class="button primary" type="button" data-go="checkin">加入 7 天状态管理</button>
+      </section>
+
+      <section class="screen" data-screen="checkin" aria-labelledby="checkinTitle">
+        <header class="page-header simple">
+          <button class="text-button" type="button" data-back>返回</button>
+          <div>
+            <h1 id="checkinTitle">7 天打卡主页</h1>
+            <span id="dayLabel">Day 1 / 7</span>
+          </div>
+          <span></span>
+        </header>
+        <section class="card task-card">
+          <div class="section-title"><h2>今日执行清单</h2><span>3 个小任务</span></div>
+          <div id="taskList"></div>
+          <button class="button primary" type="button" id="finishDay">完成今日打卡</button>
+        </section>
+        <section class="card calendar-card">
+          <div class="section-title"><h2>状态日历</h2><span id="calendarStatus">已完成 0 / 7</span></div>
+          <div class="calendar" id="calendar"></div>
+        </section>
+        <section class="metric-grid" id="checkinMetrics"></section>
+        <button class="button secondary" type="button" data-go="plan">查看完整 7 天安排</button>
+      </section>
+
+      <section class="screen" data-screen="plan" aria-labelledby="planTitle">
+        <header class="page-header simple">
+          <button class="text-button" type="button" data-back>返回</button>
+          <h1 id="planTitle">完整 7 天安排</h1>
+          <span></span>
+        </header>
+        <div class="plan-list" id="planList"></div>
+        <button class="button primary" type="button" id="makePoster">生成进度海报</button>
+      </section>
+
+      <section class="screen" data-screen="poster" aria-labelledby="posterTitle">
+        <header class="page-header simple">
+          <button class="text-button" type="button" data-back>返回</button>
+          <h1 id="posterTitle">我的进度海报</h1>
+          <span></span>
+        </header>
+        <canvas id="posterCanvas" width="750" height="1200" aria-label="7 天上镜状态管理进度海报"></canvas>
+        <button class="button primary" type="button" id="downloadPoster">保存海报图片</button>
+      </section>
+
+      <div class="modal-mask" id="modalMask" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+          <button class="modal-close" type="button" id="modalClose">关闭</button>
+          <div id="modalContent"></div>
+        </div>
+      </div>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </main>
+  </div>
+    <script src="./config.js?v=20260618-1"></script>
+    <script src="./app.js?v=20260618-1"></script>
+</body>
+</html>
