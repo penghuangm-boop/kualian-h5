@@ -1,4 +1,5 @@
 const STORAGE_KEY = "faceRescueMvpV1";
+const APP_CACHE_VERSION = "20260624-8";
 const APP_API_BASE = "http://127.0.0.1:4174";
 
 const resetRequested = new URLSearchParams(location.search).get("reset") === "1";
@@ -33,7 +34,13 @@ try {
 } catch {
   saved = {};
 }
+if (saved.appCacheVersion !== APP_CACHE_VERSION && saved.photoSummary?.hasUserUpload !== true) {
+  saved.photoAnalyzed = false;
+  saved.photoSummary = null;
+  saved.appCacheVersion = APP_CACHE_VERSION;
+}
 const state = { ...defaultState, ...saved };
+state.appCacheVersion = APP_CACHE_VERSION;
 state.answers = Array.isArray(saved.answers) ? saved.answers : [];
 state.supplements = Array.isArray(saved.supplements) ? saved.supplements : [];
 state.userReports = Array.isArray(saved.userReports) ? saved.userReports : [];
@@ -753,7 +760,7 @@ function renderMetrics(target, metrics) {
   $(target).innerHTML = Object.entries(metrics).map(([name, value], index) => `
     <article class="metric-card">
       <b>${name}</b>
-      <strong class="${index % 2 ? "purple" : ""}">${value >= 65 ? "良好" : value >= 50 ? "一般" : "待调整"}</strong>
+      <strong class="report-score-value ${index % 2 ? "purple" : ""}">${value}<span class="report-score-total">/100</span></strong>
       <div class="meter"><i style="width:${value}%"></i></div>
     </article>
   `).join("");
@@ -761,13 +768,16 @@ function renderMetrics(target, metrics) {
 
 function renderReport() {
   const profile = reportProfile();
+  const hasUploadedPhotoAnalysis = state.photoAnalyzed && state.photoSummary?.hasUserUpload === true;
+  $("#saveReport").textContent = "已保存";
   $("#reportType").textContent = profile.type;
   $("#reportLevel").textContent = profile.level;
-  $("#reportBasis").textContent = profile.isHistory
-    ? "根据历史报告记录展示，可重新测评生成最新状态"
-    : state.photoAnalyzed
-    ? "根据问卷与照片质量辅助结果生成，不识别身份"
-    : "根据问卷回答生成，可选照片辅助评估";
+  $("#reportBasis").innerHTML = profile.isHistory
+    ? '<span class="report-basis-line">根据历史报告记录展示</span><span class="report-basis-line">可重新测评生成最新状态</span>'
+    : hasUploadedPhotoAnalysis
+    ? '<span class="report-basis-line">根据问卷与照片质量辅助结果生成</span><span class="report-basis-line">不识别身份</span>'
+    : '<span class="report-basis-line">基于文字问卷生成 • 未上传照片 •</span><span class="report-basis-line">可补传照片增强分析</span>';
+  $("#reportPhotoButton").toggleAttribute("hidden", hasUploadedPhotoAnalysis);
   renderMetrics("#reportMetrics", profile.metrics);
   $("#factorList").innerHTML = profile.factors.map(([title, detail], index) => `
     <article class="factor-item">
@@ -1009,6 +1019,7 @@ function photoSummary() {
   const minEdge = Math.min(...valid.map((item) => Math.min(item.metrics.width, item.metrics.height)));
   return {
     count: valid.length,
+    hasUserUpload: true,
     light: avgBrightness < 75 ? "偏暗" : avgBrightness > 210 ? "偏亮" : "光线适中",
     contrast: avgContrast < 28 ? "画面对比偏弱" : "层次清楚",
     clarity: minEdge < 720 ? "分辨率一般" : "分辨率充足"
@@ -1166,6 +1177,7 @@ $("#analyzePhotos").addEventListener("click", () => {
 
 $("#saveReport").addEventListener("click", () => {
   state.reportSaved = true;
+  $("#saveReport").textContent = "已保存";
   saveState();
   showToast("报告已保存到本机");
 });

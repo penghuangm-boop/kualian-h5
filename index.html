@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#fff7fb">
   <meta name="description" content="垮脸自救实验室：问卷为主、照片辅助的上镜状态管理 H5。">
   <title>垮脸自救实验室</title>
-    <link rel="stylesheet" href="./styles.css?v=20260612-16">
+    <link rel="stylesheet" href="./styles.css?v=20260624-8">
 </head>
 <body>
   <div class="app-shell">
@@ -213,23 +213,25 @@
 
       <section class="screen" data-screen="report" aria-labelledby="reportTitle">
         <header class="page-header simple">
-          <button class="text-button" type="button" data-back>返回</button>
+          <button class="text-button icon-back" type="button" data-back>返回</button>
           <h1 id="reportTitle">个人分析报告</h1>
-          <button class="text-button accent" type="button" id="saveReport">保存</button>
+          <button class="text-button accent" type="button" id="saveReport">已保存</button>
         </header>
-        <section class="report-hero">
-          <img src="./assets/images/hero-woman.jpg" alt="">
-          <div>
-            <span>你的上镜状态类型</span>
+        <section class="report-visual-card">
+          <div class="report-portrait-panel">
+            <img src="./assets/images/report-card-reference-portrait.png" alt="">
+          </div>
+          <div class="report-summary-copy">
+            <span class="report-kicker">你的上镜显垮类型：</span>
             <h2 id="reportType">姿态疲惫型</h2>
             <b id="reportLevel">轻度 · 建议调整</b>
             <p id="reportBasis">根据问卷回答生成</p>
-            <button class="small-button" type="button" data-go="photo">补充照片辅助评估</button>
+            <button class="small-button" type="button" data-go="photo" id="reportPhotoButton">补传照片增强分析</button>
           </div>
         </section>
         <section class="metric-grid" id="reportMetrics"></section>
         <section class="card factor-card">
-          <div class="section-title"><h2>主要影响因素</h2><span>由高到低</span></div>
+          <div class="section-title"><h2>主要原因分析</h2><span>由高到低</span></div>
           <div id="factorList"></div>
         </section>
         <section class="card advice-card">
@@ -242,7 +244,7 @@
           <p>把主要影响因素拆成每天 3 个可以执行的小任务。</p>
           <button class="button primary" type="button" data-go="checkin">开始 7 天打卡</button>
         </section>
-        <p class="medical-note">本报告仅用于上镜状态参考，不构成医疗或美容诊断。</p>
+        <p class="medical-note report-disclaimer">本报告仅供参考，非医疗诊断建议。</p>
       </section>
 
       <section class="screen" data-screen="urgent" aria-labelledby="urgentTitle">
@@ -322,6 +324,6 @@
     </main>
   </div>
     <script src="./config.js?v=20260618-1"></script>
-    <script src="./app.js?v=20260618-1"></script>
+    <script src="./app.js?v=20260624-8"></script>
 </body>
 </html>

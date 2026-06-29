@@ -86,6 +86,37 @@ const requiredFlowSnippets = [
   'screen === "report" && state.quizDone && !state.logged',
   'openLoginModal("report")'
 ];
+const requiredReportDesignSnippets = [
+  "report-visual-card",
+  "report-portrait-panel",
+  "report-card-reference-portrait.png",
+  "report-basis-line",
+  "基于文字问卷生成",
+  "未上传照片",
+  "根据问卷与照片质量辅助结果生成",
+  "不识别身份",
+  "hasUploadedPhotoAnalysis",
+  "hasUserUpload",
+  "reportPhotoButton",
+  'toggleAttribute("hidden", hasUploadedPhotoAnalysis)',
+  "report-score-value",
+  "report-score-total",
+  "report-disclaimer",
+  "补传照片增强分析"
+];
+const requiredReportStyleSnippets = [
+  ".screen[data-screen=\"report\"]",
+  ".report-visual-card",
+  "margin: 0 0 24px",
+  ".screen[data-screen=\"report\"] .page-header.simple",
+  "position: sticky",
+  ".report-score-value",
+  ".factor-item .factor-index",
+  ".report-basis-line + .report-basis-line",
+  ".screen[data-screen=\"report\"] .plan-cta .button.primary",
+  ".factor-card::before",
+  ".report-disclaimer"
+];
 
 const missingScreens = requiredScreens.filter((screen) => !screens.includes(screen));
 const missingLogic = requiredLogic.filter((name) => !js.includes(`function ${name}`));
@@ -141,6 +172,9 @@ const failures = {
   missingScreens,
   missingLogic,
   missingFlow,
+  missingReportDesign: requiredReportDesignSnippets.filter((snippet) => !html.includes(snippet) && !js.includes(snippet)),
+  wrongReportHeroImage: html.includes("report-card-reference-portrait.png") ? [] : ["report hero should use the illustrated reference portrait"],
+  missingReportStyles: requiredReportStyleSnippets.filter((snippet) => !css.includes(snippet)),
   missingAdmin: requiredAdminSnippets.filter((snippet) => !adminHtml.includes(snippet)),
   missingConfig: requiredConfigSnippets.filter((snippet) => !configJs.includes(snippet)),
   missingSharedConfigScripts: ["config.js?v=20260618-1"].filter((snippet) => !html.includes(snippet) || !adminHtml.includes(snippet)),
