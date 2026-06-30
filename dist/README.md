@@ -55,6 +55,17 @@ GET http://127.0.0.1:4174/api/admin/config/:key
 PUT http://127.0.0.1:4174/api/admin/config/:key
 ```
 
+微信登录与支付骨架也在本地 API 中，未配置真实公众号和商户号时默认使用 mock 模式：
+
+```text
+GET http://127.0.0.1:4174/api/wechat/config
+GET http://127.0.0.1:4174/api/wechat/oauth-url
+GET http://127.0.0.1:4174/api/wechat/callback
+GET http://127.0.0.1:4174/api/auth/session
+POST http://127.0.0.1:4174/api/pay/orders
+POST http://127.0.0.1:4174/api/pay/notify
+```
+
 H5 会在模拟微信登录时创建/读取本地用户，并在完成测评、完成照片辅助、完成打卡时尝试写入本地 API；登录用户首页会同步展示自己的历史报告。后台会优先读取本地 API，数据概览、用户管理和用户报告会优先展示 SQLite 真实数据。后台问卷题库、垮脸类型参数和报告内容配置会同步到 SQLite，H5 打开时也会尝试读取这份远程配置。如果 API 没开启，页面会自动回退到本地演示数据。SQLite 数据文件位于：
 
 ```text
@@ -100,6 +111,47 @@ DEPLOY.md
 - 暂不上传照片时可以进入报告页。
 - 登录弹窗、报告页、7 天打卡、海报生成可用。
 - `admin.html` 当前没有鉴权，正式公开前建议隐藏入口或加登录保护。
+
+## 公众号登录与微信支付
+
+当前仓库已经预留公众号网页登录和微信 JSAPI 支付骨架。真实密钥不要写进代码，也不要提交到 GitHub；复制 `.env.example` 为 `.env` 后只在服务器上填写。
+
+本地开发默认值：
+
+```text
+WECHAT_MODE=mock
+WECHAT_PAY_MODE=mock
+```
+
+这时点击登录会走本地模拟登录，点击“开始 7 天打卡”会创建 mock 支付订单并显示“模拟支付成功”。
+
+等公众号和商户号注册完成后，需要准备：
+
+- 已认证公众号的 `AppID` 和 `AppSecret`
+- HTTPS 正式域名
+- 公众号后台配置的网页授权域名
+- 微信商户号 `mchid`
+- API v3 密钥
+- 商户 API 证书私钥路径和证书序列号
+- 支付回调地址，例如 `https://你的域名/api/pay/notify`
+
+服务器 `.env` 切换示例：
+
+```text
+PUBLIC_BASE_URL=https://你的域名
+WECHAT_MODE=wechat
+WECHAT_APP_ID=公众号 AppID
+WECHAT_APP_SECRET=公众号 AppSecret
+WECHAT_OAUTH_REDIRECT_URI=https://你的域名/api/wechat/callback
+WECHAT_PAY_MODE=wechat_jsapi
+WECHAT_MCH_ID=商户号
+WECHAT_PAY_API_V3_KEY=API v3 密钥
+WECHAT_PAY_PRIVATE_KEY_PATH=/secure/path/apiclient_key.pem
+WECHAT_PAY_SERIAL_NO=证书序列号
+WECHAT_PAY_NOTIFY_URL=https://你的域名/api/pay/notify
+```
+
+骨架目前会在真实支付资料未配齐时返回 `wechat_pay_not_configured`，不会假装真实支付成功。后续接正式支付时，需要在 `mock-api.js` 的 `createPaymentOrder` 中补微信支付 v3 JSAPI 下单签名和平台回调验签。
 
 ## 当前数据范围
 

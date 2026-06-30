@@ -15,6 +15,9 @@ const adminJs = fs.readFileSync(path.join(root, "admin.js"), "utf8");
 const mockApiPath = path.join(root, "mock-api.js");
 const hasMockApi = fs.existsSync(mockApiPath);
 const mockApiJs = hasMockApi ? fs.readFileSync(mockApiPath, "utf8") : "";
+const envExamplePath = path.join(root, ".env.example");
+const hasEnvExample = fs.existsSync(envExamplePath);
+const envExample = hasEnvExample ? fs.readFileSync(envExamplePath, "utf8") : "";
 const quizBlock = js.match(/const quiz = \[([\s\S]*?)\n\];/)?.[1] || "";
 const questionCount = [...quizBlock.matchAll(/\n\s+question:/g)].length;
 const questionTitles = [...quizBlock.matchAll(/question: "([^"]+)"/g)].map((match) => match[1]);
@@ -184,6 +187,50 @@ const failures = {
       const needle = snippet === "/api/admin/reports/:id/note" ? "/note" : snippet;
       return !mockApiJs.includes(needle);
     })
+    : [],
+  missingWechatBackend: hasMockApi
+    ? [
+      "readWechatConfig",
+      "createWechatOAuthUrl",
+      "handleWechatCallback",
+      "getSessionFromRequest",
+      "createPaymentOrder",
+      "handlePaymentNotify",
+      "/api/wechat/config",
+      "/api/wechat/oauth-url",
+      "/api/wechat/callback",
+      "/api/auth/session",
+      "/api/pay/orders",
+      "/api/pay/notify",
+      "WECHAT_MODE",
+      "WECHAT_PAY_MODE"
+    ].filter((snippet) => !mockApiJs.includes(snippet))
+    : [],
+  missingWechatFrontend: [
+    "loadWechatRuntimeConfig",
+    "loginWithWechatOrMock",
+    "createPaymentOrder",
+    "startSevenDayPlan",
+    "/api/wechat/config",
+    "/api/wechat/oauth-url",
+    "/api/pay/orders",
+    "微信授权登录",
+    "模拟支付成功"
+  ].filter((snippet) => !js.includes(snippet) && !html.includes(snippet)),
+  missingEnvExample: hasMockApi
+    ? hasEnvExample
+      ? [
+      "WECHAT_MODE=mock",
+      "WECHAT_APP_ID=",
+      "WECHAT_APP_SECRET=",
+      "WECHAT_OAUTH_REDIRECT_URI=",
+      "WECHAT_PAY_MODE=mock",
+      "WECHAT_MCH_ID=",
+      "WECHAT_PAY_API_V3_KEY=",
+      "WECHAT_PAY_PRIVATE_KEY_PATH=",
+      "PUBLIC_BASE_URL="
+      ].filter((snippet) => !envExample.includes(snippet))
+      : [".env.example missing"]
     : [],
   collapseTypeCount: collapseTypeCount === 6 ? [] : [`expected 6 collapse face types, found ${collapseTypeCount}`],
   questionCount: questionCount === 10 ? [] : [`expected 10 questions, found ${questionCount}`],

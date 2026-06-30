@@ -13,3 +13,4 @@ design-qa.md
 node_modules/
 .env
 .env.*
+!.env.example

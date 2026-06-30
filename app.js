@@ -76,6 +76,14 @@ let questionIndex = 0;
 let uploads = [];
 let toastTimer;
 let postLoginScreen = null;
+let wechatRuntimeConfig = {
+  wechatMode: "mock",
+  payMode: "mock",
+  oauthReady: false,
+  payReady: false,
+  productName: "7 天状态管理",
+  amountCents: 990
+};
 
 async function apiRequest(path, options = {}) {
   const response = await fetch(`${APP_API_BASE}${path}`, {
@@ -115,6 +123,74 @@ async function mockLoginToApi() {
     return result.user;
   } catch {
     return null;
+  }
+}
+
+async function loadWechatRuntimeConfig() {
+  try {
+    wechatRuntimeConfig = await apiRequest("/api/wechat/config");
+  } catch {
+    wechatRuntimeConfig = {
+      ...wechatRuntimeConfig,
+      wechatMode: "mock",
+      payMode: "mock",
+      oauthReady: false,
+      payReady: false
+    };
+  }
+  return wechatRuntimeConfig;
+}
+
+async function loginWithWechatOrMock() {
+  const config = await loadWechatRuntimeConfig();
+  if (config.oauthReady) {
+    const payload = await apiRequest(`/api/wechat/oauth-url?state=${Date.now()}`);
+    if (payload.loginUrl) {
+      location.href = payload.loginUrl;
+      return { redirected: true };
+    }
+  }
+
+  state.logged = true;
+  saveState();
+  await mockLoginToApi();
+  if (state.quizDone) {
+    await syncReportToApi();
+  } else {
+    await loadUserReportsFromApi();
+  }
+  return { redirected: false };
+}
+
+async function createPaymentOrder() {
+  return apiRequest("/api/pay/orders", {
+    method: "POST",
+    body: JSON.stringify({
+      reportId: state.backendReportId,
+      userId: state.userId,
+      productName: wechatRuntimeConfig.productName || "7 天状态管理",
+      amountCents: wechatRuntimeConfig.amountCents || 990
+    })
+  });
+}
+
+async function startSevenDayPlan() {
+  if (!state.logged) {
+    openLoginModal("checkin");
+    return;
+  }
+  try {
+    const payment = await createPaymentOrder();
+    if (payment.status === "paid_mock") {
+      showToast("模拟支付成功，已开通 7 天状态管理");
+      go("checkin");
+      return;
+    }
+    showToast("支付订单已创建，等待微信支付参数");
+    go("checkin");
+  } catch {
+    showToast("微信支付未配置，先进入体验流程");
+    go("checkin");
   }
 }
 
@@ -468,13 +544,14 @@ function openLoginModal(destination = null) {
   if (!$("#modalMask").hidden && $("#confirmLogin")) return;
   postLoginScreen = destination;
   const isReportLogin = destination === "report";
+  const loginButtonText = wechatRuntimeConfig.oauthReady ? "微信授权登录" : "模拟微信登录";
   openModal(`
     <span class="eyebrow">微信登录</span>
     <h2>${isReportLogin ? "登录后查看个人报告" : "保存你的状态档案"}</h2>
     <p>${isReportLogin
       ? "登录用于保存测评结果、照片辅助结论和 7 天进度。完成登录后将自动进入你的个人报告。"
-      : "当前版本只在本机浏览器保存状态，不会连接或获取真实微信账户信息。"}</p>
-    <button class="button wechat" type="button" id="confirmLogin">模拟微信登录</button>
+      : "公众号配置完成后将使用微信授权登录；当前未配置时会使用本地模拟登录。"}</p>
+    <button class="button wechat" type="button" id="confirmLogin">${loginButtonText}</button>
   `);
 }
 
@@ -1027,6 +1104,11 @@ function photoSummary() {
 }
 
 document.addEventListener("click", (event) => {
+  const planButton = event.target.closest("[data-start-plan]");
+  if (planButton) {
+    startSevenDayPlan();
+    return;
+  }
   const goButton = event.target.closest("[data-go]");
   if (goButton) {
     if (goButton.dataset.go === "quiz") {
@@ -1254,19 +1336,17 @@ window.addEventListener("popstate", (event) => {
 
 $("#modalContent").addEventListener("click", async (event) => {
   if (event.target.closest("#confirmLogin")) {
-    state.logged = true;
-    saveState();
-    await mockLoginToApi();
-    if (state.quizDone) {
-      await syncReportToApi();
-    } else {
-      await loadUserReportsFromApi();
-    }
-    closeModal();
     const destination = postLoginScreen;
+    const result = await loginWithWechatOrMock();
+    if (result.redirected) return;
+    closeModal();
     postLoginScreen = null;
     showToast("登录成功，正在生成个人报告");
-    if (destination) go(destination);
+    if (destination === "checkin") {
+      await startSevenDayPlan();
+    } else if (destination) {
+      go(destination);
+    }
   }
   if (event.target.closest("#aboutStart")) {
     closeModal();
@@ -1289,3 +1369,4 @@ $("#modalContent").addEventListener("click", async (event) => {
 history.replaceState({ screen: initialScreen }, "", `#${initialScreen}`);
 setScreen(initialScreen);
 loadRemoteAdminConfig();
+loadWechatRuntimeConfig();

@@ -1,4 +1,5 @@
 const http = require("node:http");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
@@ -6,6 +7,29 @@ const { execFileSync } = require("node:child_process");
 const port = Number(process.env.PORT || 4174);
 const dataDir = path.join(__dirname, "data");
 const dbPath = path.join(dataDir, "kuailian.sqlite");
+
+loadEnvFile();
+
+function loadEnvFile() {
+  const envPath = path.join(__dirname, ".env");
+  if (!fs.existsSync(envPath)) return;
+  const lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/);
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) return;
+    const [key, ...valueParts] = trimmed.split("=");
+    if (process.env[key]) return;
+    process.env[key] = valueParts.join("=").replace(/^["']|["']$/g, "");
+  });
+}
+
+function env(name, fallback = "") {
+  return process.env[name] || fallback;
+}
+
+function publicBaseUrl() {
+  return env("PUBLIC_BASE_URL", "http://127.0.0.1:4173").replace(/\/$/, "");
+}
 
 const seedReports = [
   {
@@ -247,6 +271,175 @@ function mockLogin(payload = {}) {
   return getUser(userId);
 }
 
+function readWechatConfig() {
+  const wechatMode = env("WECHAT_MODE", "mock");
+  const payMode = env("WECHAT_PAY_MODE", "mock");
+  const oauthRedirectUri = env(
+    "WECHAT_OAUTH_REDIRECT_URI",
+    `${publicBaseUrl()}/api/wechat/callback`
+  );
+  const payNotifyUrl = env(
+    "WECHAT_PAY_NOTIFY_URL",
+    `${publicBaseUrl()}/api/pay/notify`
+  );
+  const oauthReady = Boolean(
+    env("WECHAT_APP_ID") &&
+    env("WECHAT_APP_SECRET") &&
+    oauthRedirectUri
+  );
+  const payReady = Boolean(
+    env("WECHAT_MCH_ID") &&
+    env("WECHAT_PAY_API_V3_KEY") &&
+    env("WECHAT_PAY_PRIVATE_KEY_PATH") &&
+    env("WECHAT_PAY_SERIAL_NO") &&
+    payNotifyUrl
+  );
+
+  return {
+    wechatMode,
+    payMode,
+    publicBaseUrl: publicBaseUrl(),
+    oauthReady: wechatMode === "wechat" && oauthReady,
+    payReady: payMode === "wechat_jsapi" && payReady,
+    appId: env("WECHAT_APP_ID"),
+    appSecret: env("WECHAT_APP_SECRET"),
+    oauthRedirectUri,
+    mchId: env("WECHAT_MCH_ID"),
+    payNotifyUrl,
+    productName: env("WECHAT_PAY_PRODUCT_NAME", "7 天状态管理"),
+    amountCents: Number(env("WECHAT_PAY_AMOUNT_CENTS", "990"))
+  };
+}
+
+function publicWechatConfig() {
+  const config = readWechatConfig();
+  return {
+    wechatMode: config.wechatMode,
+    payMode: config.payMode,
+    oauthReady: config.oauthReady,
+    payReady: config.payReady,
+    publicBaseUrl: config.publicBaseUrl,
+    productName: config.productName,
+    amountCents: config.amountCents
+  };
+}
+
+function createWechatOAuthUrl(payload = {}) {
+  const config = readWechatConfig();
+  if (!config.oauthReady) {
+    return {
+      mode: "mock",
+      loginUrl: null,
+      reason: config.wechatMode === "wechat" ? "wechat_oauth_not_configured" : "mock_mode"
+    };
+  }
+  const state = payload.state || crypto.randomBytes(8).toString("hex");
+  const params = new URLSearchParams({
+    appid: config.appId,
+    redirect_uri: config.oauthRedirectUri,
+    response_type: "code",
+    scope: payload.scope || "snsapi_base",
+    state
+  });
+  return {
+    mode: "wechat",
+    state,
+    loginUrl: `https://open.weixin.qq.com/connect/oauth2/authorize?${params.toString()}#wechat_redirect`
+  };
+}
+
+function handleWechatCallback(url) {
+  const config = readWechatConfig();
+  if (!config.oauthReady) {
+    return {
+      redirect: `${config.publicBaseUrl}/#home`,
+      user: mockLogin({ nickname: "微信模拟用户", openid: `mock-oauth-${Date.now()}` }),
+      mode: "mock"
+    };
+  }
+  if (!url.searchParams.get("code")) {
+    return {
+      redirect: `${config.publicBaseUrl}/#home?wechat_error=missing_code`,
+      user: null,
+      mode: "wechat"
+    };
+  }
+  return {
+    redirect: `${config.publicBaseUrl}/#home?wechat_error=exchange_pending`,
+    user: null,
+    mode: "wechat",
+    error: "wechat_code_exchange_pending"
+  };
+}
+
+function parseCookies(request) {
+  return Object.fromEntries(String(request.headers.cookie || "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const [key, ...valueParts] = part.split("=");
+      return [decodeURIComponent(key), decodeURIComponent(valueParts.join("="))];
+    }));
+}
+
+function getSessionFromRequest(request) {
+  const cookies = parseCookies(request);
+  const userId = cookies.kuailian_user_id;
+  const user = userId ? getUser(userId) : null;
+  return { logged: Boolean(user), user };
+}
+
+function createPaymentOrder(payload = {}, request = null) {
+  const config = readWechatConfig();
+  const session = request ? getSessionFromRequest(request) : { user: null };
+  const orderId = `pay-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
+  const amountCents = Math.max(1, Number(payload.amountCents || config.amountCents || 990));
+  const order = {
+    id: orderId,
+    mode: config.payMode,
+    productName: payload.productName || config.productName,
+    amountCents,
+    reportId: payload.reportId || null,
+    userId: payload.userId || session.user?.id || null,
+    createdAt: new Date().toISOString()
+  };
+
+  if (config.payMode !== "wechat_jsapi") {
+    if (order.reportId) writeEvent(order.reportId, "payment_mock_paid", order);
+    return {
+      order,
+      payParams: null,
+      status: "paid_mock",
+      message: "模拟支付成功"
+    };
+  }
+
+  if (!config.payReady) {
+    return {
+      order,
+      payParams: null,
+      status: "not_configured",
+      error: "wechat_pay_not_configured"
+    };
+  }
+
+  return {
+    order,
+    payParams: null,
+    status: "pending_real_integration",
+    error: "wechat_pay_jsapi_signing_pending"
+  };
+}
+
+function handlePaymentNotify(payload = {}) {
+  return {
+    code: "SUCCESS",
+    message: "mock notification accepted",
+    payload
+  };
+}
+
 function listUsers() {
   return runSql(`
     SELECT
@@ -376,7 +569,7 @@ function writeConfig(key, value) {
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET,PUT,OPTIONS",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Content-Type": "application/json; charset=utf-8"
   });
@@ -415,6 +608,35 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "GET" && url.pathname === "/api/wechat/config") {
+      sendJson(response, 200, publicWechatConfig());
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/wechat/oauth-url") {
+      sendJson(response, 200, createWechatOAuthUrl({
+        state: url.searchParams.get("state") || undefined,
+        scope: url.searchParams.get("scope") || undefined
+      }));
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/wechat/callback") {
+      const result = handleWechatCallback(url);
+      const headers = { Location: result.redirect };
+      if (result.user?.id) {
+        headers["Set-Cookie"] = `kuailian_user_id=${encodeURIComponent(result.user.id)}; Path=/; HttpOnly; SameSite=Lax`;
+      }
+      response.writeHead(302, headers);
+      response.end();
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/auth/session") {
+      sendJson(response, 200, getSessionFromRequest(request));
+      return;
+    }
+
     if (request.method === "GET" && url.pathname === "/api/admin/reports") {
       sendJson(response, 200, { reports: listReports() });
       return;
@@ -450,6 +672,20 @@ const server = http.createServer(async (request, response) => {
     if (request.method === "POST" && url.pathname === "/api/reports") {
       const body = await readBody(request);
       sendJson(response, 201, { report: createReport(body) });
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/pay/orders") {
+      const body = await readBody(request);
+      const payment = createPaymentOrder(body, request);
+      const statusCode = payment.status === "not_configured" ? 409 : 201;
+      sendJson(response, statusCode, payment);
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/pay/notify") {
+      const body = await readBody(request);
+      sendJson(response, 200, handlePaymentNotify(body));
       return;
     }
 

@@ -1,4 +1,5 @@
 const STORAGE_KEY = "faceRescueMvpV1";
+const APP_CACHE_VERSION = "20260624-8";
 const APP_API_BASE = "http://127.0.0.1:4174";
 
 const resetRequested = new URLSearchParams(location.search).get("reset") === "1";
@@ -33,7 +34,13 @@ try {
 } catch {
   saved = {};
 }
+if (saved.appCacheVersion !== APP_CACHE_VERSION && saved.photoSummary?.hasUserUpload !== true) {
+  saved.photoAnalyzed = false;
+  saved.photoSummary = null;
+  saved.appCacheVersion = APP_CACHE_VERSION;
+}
 const state = { ...defaultState, ...saved };
+state.appCacheVersion = APP_CACHE_VERSION;
 state.answers = Array.isArray(saved.answers) ? saved.answers : [];
 state.supplements = Array.isArray(saved.supplements) ? saved.supplements : [];
 state.userReports = Array.isArray(saved.userReports) ? saved.userReports : [];
@@ -69,6 +76,14 @@ let questionIndex = 0;
 let uploads = [];
 let toastTimer;
 let postLoginScreen = null;
+let wechatRuntimeConfig = {
+  wechatMode: "mock",
+  payMode: "mock",
+  oauthReady: false,
+  payReady: false,
+  productName: "7 天状态管理",
+  amountCents: 990
+};
 
 async function apiRequest(path, options = {}) {
   const response = await fetch(`${APP_API_BASE}${path}`, {
@@ -108,6 +123,74 @@ async function mockLoginToApi() {
     return result.user;
   } catch {
     return null;
+  }
+}
+
+async function loadWechatRuntimeConfig() {
+  try {
+    wechatRuntimeConfig = await apiRequest("/api/wechat/config");
+  } catch {
+    wechatRuntimeConfig = {
+      ...wechatRuntimeConfig,
+      wechatMode: "mock",
+      payMode: "mock",
+      oauthReady: false,
+      payReady: false
+    };
+  }
+  return wechatRuntimeConfig;
+}
+
+async function loginWithWechatOrMock() {
+  const config = await loadWechatRuntimeConfig();
+  if (config.oauthReady) {
+    const payload = await apiRequest(`/api/wechat/oauth-url?state=${Date.now()}`);
+    if (payload.loginUrl) {
+      location.href = payload.loginUrl;
+      return { redirected: true };
+    }
+  }
+
+  state.logged = true;
+  saveState();
+  await mockLoginToApi();
+  if (state.quizDone) {
+    await syncReportToApi();
+  } else {
+    await loadUserReportsFromApi();
+  }
+  return { redirected: false };
+}
+
+async function createPaymentOrder() {
+  return apiRequest("/api/pay/orders", {
+    method: "POST",
+    body: JSON.stringify({
+      reportId: state.backendReportId,
+      userId: state.userId,
+      productName: wechatRuntimeConfig.productName || "7 天状态管理",
+      amountCents: wechatRuntimeConfig.amountCents || 990
+    })
+  });
+}
+
+async function startSevenDayPlan() {
+  if (!state.logged) {
+    openLoginModal("checkin");
+    return;
+  }
+  try {
+    const payment = await createPaymentOrder();
+    if (payment.status === "paid_mock") {
+      showToast("模拟支付成功，已开通 7 天状态管理");
+      go("checkin");
+      return;
+    }
+    showToast("支付订单已创建，等待微信支付参数");
+    go("checkin");
+  } catch {
+    showToast("微信支付未配置，先进入体验流程");
+    go("checkin");
   }
 }
 
@@ -461,13 +544,14 @@ function openLoginModal(destination = null) {
   if (!$("#modalMask").hidden && $("#confirmLogin")) return;
   postLoginScreen = destination;
   const isReportLogin = destination === "report";
+  const loginButtonText = wechatRuntimeConfig.oauthReady ? "微信授权登录" : "模拟微信登录";
   openModal(`
     <span class="eyebrow">微信登录</span>
     <h2>${isReportLogin ? "登录后查看个人报告" : "保存你的状态档案"}</h2>
     <p>${isReportLogin
       ? "登录用于保存测评结果、照片辅助结论和 7 天进度。完成登录后将自动进入你的个人报告。"
-      : "当前版本只在本机浏览器保存状态，不会连接或获取真实微信账户信息。"}</p>
-    <button class="button wechat" type="button" id="confirmLogin">模拟微信登录</button>
+      : "公众号配置完成后将使用微信授权登录；当前未配置时会使用本地模拟登录。"}</p>
+    <button class="button wechat" type="button" id="confirmLogin">${loginButtonText}</button>
   `);
 }
 
@@ -753,7 +837,7 @@ function renderMetrics(target, metrics) {
   $(target).innerHTML = Object.entries(metrics).map(([name, value], index) => `
     <article class="metric-card">
       <b>${name}</b>
-      <strong class="${index % 2 ? "purple" : ""}">${value >= 65 ? "良好" : value >= 50 ? "一般" : "待调整"}</strong>
+      <strong class="report-score-value ${index % 2 ? "purple" : ""}">${value}<span class="report-score-total">/100</span></strong>
       <div class="meter"><i style="width:${value}%"></i></div>
     </article>
   `).join("");
@@ -761,13 +845,16 @@ function renderMetrics(target, metrics) {
 
 function renderReport() {
   const profile = reportProfile();
+  const hasUploadedPhotoAnalysis = state.photoAnalyzed && state.photoSummary?.hasUserUpload === true;
+  $("#saveReport").textContent = "已保存";
   $("#reportType").textContent = profile.type;
   $("#reportLevel").textContent = profile.level;
-  $("#reportBasis").textContent = profile.isHistory
-    ? "根据历史报告记录展示，可重新测评生成最新状态"
-    : state.photoAnalyzed
-    ? "根据问卷与照片质量辅助结果生成，不识别身份"
-    : "根据问卷回答生成，可选照片辅助评估";
+  $("#reportBasis").innerHTML = profile.isHistory
+    ? '<span class="report-basis-line">根据历史报告记录展示</span><span class="report-basis-line">可重新测评生成最新状态</span>'
+    : hasUploadedPhotoAnalysis
+    ? '<span class="report-basis-line">根据问卷与照片质量辅助结果生成</span><span class="report-basis-line">不识别身份</span>'
+    : '<span class="report-basis-line">基于文字问卷生成 • 未上传照片 •</span><span class="report-basis-line">可补传照片增强分析</span>';
+  $("#reportPhotoButton").toggleAttribute("hidden", hasUploadedPhotoAnalysis);
   renderMetrics("#reportMetrics", profile.metrics);
   $("#factorList").innerHTML = profile.factors.map(([title, detail], index) => `
     <article class="factor-item">
@@ -1009,6 +1096,7 @@ function photoSummary() {
   const minEdge = Math.min(...valid.map((item) => Math.min(item.metrics.width, item.metrics.height)));
   return {
     count: valid.length,
+    hasUserUpload: true,
     light: avgBrightness < 75 ? "偏暗" : avgBrightness > 210 ? "偏亮" : "光线适中",
     contrast: avgContrast < 28 ? "画面对比偏弱" : "层次清楚",
     clarity: minEdge < 720 ? "分辨率一般" : "分辨率充足"
@@ -1016,6 +1104,11 @@ function photoSummary() {
 }
 
 document.addEventListener("click", (event) => {
+  const planButton = event.target.closest("[data-start-plan]");
+  if (planButton) {
+    startSevenDayPlan();
+    return;
+  }
   const goButton = event.target.closest("[data-go]");
   if (goButton) {
     if (goButton.dataset.go === "quiz") {
@@ -1166,6 +1259,7 @@ $("#analyzePhotos").addEventListener("click", () => {
 
 $("#saveReport").addEventListener("click", () => {
   state.reportSaved = true;
+  $("#saveReport").textContent = "已保存";
   saveState();
   showToast("报告已保存到本机");
 });
@@ -1242,19 +1336,17 @@ window.addEventListener("popstate", (event) => {
 
 $("#modalContent").addEventListener("click", async (event) => {
   if (event.target.closest("#confirmLogin")) {
-    state.logged = true;
-    saveState();
-    await mockLoginToApi();
-    if (state.quizDone) {
-      await syncReportToApi();
-    } else {
-      await loadUserReportsFromApi();
-    }
-    closeModal();
     const destination = postLoginScreen;
+    const result = await loginWithWechatOrMock();
+    if (result.redirected) return;
+    closeModal();
     postLoginScreen = null;
     showToast("登录成功，正在生成个人报告");
-    if (destination) go(destination);
+    if (destination === "checkin") {
+      await startSevenDayPlan();
+    } else if (destination) {
+      go(destination);
+    }
   }
   if (event.target.closest("#aboutStart")) {
     closeModal();
@@ -1277,3 +1369,4 @@ $("#modalContent").addEventListener("click", async (event) => {
 history.replaceState({ screen: initialScreen }, "", `#${initialScreen}`);
 setScreen(initialScreen);
 loadRemoteAdminConfig();
+loadWechatRuntimeConfig();
