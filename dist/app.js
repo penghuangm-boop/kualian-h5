@@ -1,6 +1,8 @@
 const STORAGE_KEY = "faceRescueMvpV1";
 const APP_CACHE_VERSION = "20260624-8";
-const APP_API_BASE = "http://127.0.0.1:4174";
+const APP_API_BASE = ["127.0.0.1", "localhost"].includes(location.hostname)
+  ? "http://127.0.0.1:4174"
+  : "";
 
 const resetRequested = new URLSearchParams(location.search).get("reset") === "1";
 if (resetRequested) {
