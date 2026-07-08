@@ -18,6 +18,24 @@ const mockApiJs = hasMockApi ? fs.readFileSync(mockApiPath, "utf8") : "";
 const envExamplePath = path.join(root, ".env.example");
 const hasEnvExample = fs.existsSync(envExamplePath);
 const envExample = hasEnvExample ? fs.readFileSync(envExamplePath, "utf8") : "";
+const serverFiles = {
+  index: path.join(root, "server/index.js"),
+  config: path.join(root, "server/config.js"),
+  db: path.join(root, "server/db.js"),
+  http: path.join(root, "server/http.js"),
+  authRoutes: path.join(root, "server/routes/auth.js"),
+  reportRoutes: path.join(root, "server/routes/reports.js"),
+  adminRoutes: path.join(root, "server/routes/admin.js"),
+  wechatRoutes: path.join(root, "server/routes/wechat.js"),
+  paymentRoutes: path.join(root, "server/routes/payments.js"),
+  wechatService: path.join(root, "server/services/wechat.js"),
+  paymentService: path.join(root, "server/services/payments.js")
+};
+const serverSources = Object.fromEntries(Object.entries(serverFiles).map(([key, file]) => [
+  key,
+  fs.existsSync(file) ? fs.readFileSync(file, "utf8") : ""
+]));
+const backendSource = [mockApiJs, ...Object.values(serverSources)].join("\n");
 const quizBlock = js.match(/const quiz = \[([\s\S]*?)\n\];/)?.[1] || "";
 const questionCount = [...quizBlock.matchAll(/\n\s+question:/g)].length;
 const questionTitles = [...quizBlock.matchAll(/question: "([^"]+)"/g)].map((match) => match[1]);
@@ -185,7 +203,7 @@ const failures = {
   missingMockApi: hasMockApi
     ? ["/api/admin/reports", "/api/admin/reports/:id/note", "/api/auth/mock-login", "/api/admin/users", "updateUserMeta", "stage TEXT", "note TEXT", "/api/reports", "/photo", "/checkin", "CREATE TABLE IF NOT EXISTS users", "user_id", "report_events", "admin_config", "sqlite3", "kuailian.sqlite", "Access-Control-Allow-Origin"].filter((snippet) => {
       const needle = snippet === "/api/admin/reports/:id/note" ? "/note" : snippet;
-      return !mockApiJs.includes(needle);
+      return !backendSource.includes(needle);
     })
     : [],
   missingWechatBackend: hasMockApi
@@ -204,7 +222,7 @@ const failures = {
       "/api/pay/notify",
       "WECHAT_MODE",
       "WECHAT_PAY_MODE"
-    ].filter((snippet) => !mockApiJs.includes(snippet))
+    ].filter((snippet) => !backendSource.includes(snippet))
     : [],
   missingWechatFrontend: [
     "loadWechatRuntimeConfig",
@@ -228,9 +246,48 @@ const failures = {
       "WECHAT_MCH_ID=",
       "WECHAT_PAY_API_V3_KEY=",
       "WECHAT_PAY_PRIVATE_KEY_PATH=",
-      "PUBLIC_BASE_URL="
+      "PUBLIC_BASE_URL=",
+      "DATA_DIR=",
+      "KUAILIAN_DB_PATH="
       ].filter((snippet) => !envExample.includes(snippet))
       : [".env.example missing"]
+    : [],
+  missingProductionServer: hasMockApi
+    ? Object.entries(serverFiles)
+      .filter(([, file]) => !fs.existsSync(file))
+      .map(([key]) => `${key} missing`)
+    : [],
+  missingOrderModel: hasMockApi
+    ? [
+      "CREATE TABLE IF NOT EXISTS orders",
+      "product_code TEXT NOT NULL",
+      "status TEXT NOT NULL",
+      "pay_mode TEXT NOT NULL",
+      "wechat_prepay_id TEXT",
+      "transaction_id TEXT",
+      "paid_at TEXT",
+      "createOrder",
+      "markOrderPaid",
+      "listOrders"
+    ].filter((snippet) => !backendSource.includes(snippet))
+    : [],
+  missingOrderRoutes: hasMockApi
+    ? [
+      "createPaymentOrder",
+      "handlePaymentNotify",
+      "GET",
+      "/api/admin/orders",
+      "/api/admin/orders/:id",
+      "/api/pay/orders",
+      "/api/pay/notify",
+      "paid_mock"
+    ].filter((snippet) => {
+      const paymentSource = serverSources.paymentRoutes + serverSources.paymentService + serverSources.adminRoutes;
+      return !paymentSource.includes(snippet);
+    })
+    : [],
+  missingMockApiWrapper: hasMockApi
+    ? ["require(\"./server/index\")", "startServer"].filter((snippet) => !mockApiJs.includes(snippet))
     : [],
   collapseTypeCount: collapseTypeCount === 6 ? [] : [`expected 6 collapse face types, found ${collapseTypeCount}`],
   questionCount: questionCount === 10 ? [] : [`expected 10 questions, found ${questionCount}`],

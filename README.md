@@ -21,11 +21,15 @@
 python3 -m http.server 4173 --bind 127.0.0.1
 ```
 
-可选启动本地 SQLite API：
+可选启动本地 SQLite API。推荐使用生产后端入口：
 
 ```bash
-node mock-api.js
+node server/index.js
 ```
+
+旧命令 `node mock-api.js` 仍然可用，它现在只是兼容入口，会转到同一个 `server/index.js` 服务。
+
+后端当前使用 SQLite 本地库，并通过系统 `sqlite3` 命令读写数据；部署服务器需要安装 Node.js 和 `sqlite3`。
 
 然后访问：
 
@@ -53,6 +57,8 @@ PUT http://127.0.0.1:4174/api/reports/:id/photo
 PUT http://127.0.0.1:4174/api/reports/:id/checkin
 GET http://127.0.0.1:4174/api/admin/config/:key
 PUT http://127.0.0.1:4174/api/admin/config/:key
+GET http://127.0.0.1:4174/api/admin/orders
+GET http://127.0.0.1:4174/api/admin/orders/:id
 ```
 
 微信登录与支付骨架也在本地 API 中，未配置真实公众号和商户号时默认使用 mock 模式：
@@ -151,7 +157,19 @@ WECHAT_PAY_SERIAL_NO=证书序列号
 WECHAT_PAY_NOTIFY_URL=https://你的域名/api/pay/notify
 ```
 
-骨架目前会在真实支付资料未配齐时返回 `wechat_pay_not_configured`，不会假装真实支付成功。后续接正式支付时，需要在 `mock-api.js` 的 `createPaymentOrder` 中补微信支付 v3 JSAPI 下单签名和平台回调验签。
+骨架目前会在真实支付资料未配齐时返回 `wechat_pay_not_configured`，不会假装真实支付成功。后续接正式支付时，需要在 `server/services/payments.js` 中补微信支付 v3 JSAPI 下单签名和平台回调验签。
+
+后端已经预留 `orders` 表，用于记录 7 天状态管理订单：
+
+```text
+pending  待支付
+paid     已支付
+failed   支付失败
+closed   已关闭
+refunded 已退款
+```
+
+本地 mock 支付会创建订单并立即标记为 `paid`，后台可通过 `/api/admin/orders` 查看订单列表。
 
 ## 当前数据范围
 
@@ -167,6 +185,7 @@ WECHAT_PAY_NOTIFY_URL=https://你的域名/api/pay/notify
 
 ```bash
 node tests/smoke.mjs
+node tests/api-orders.mjs
 ```
 
 该检查会验证页面数量、重复 ID、静态资源引用和关键业务代码是否存在。
