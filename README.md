@@ -144,6 +144,7 @@ WECHAT_PAY_MODE=mock
 服务器 `.env` 切换示例：
 
 ```text
+NODE_ENV=production
 PUBLIC_BASE_URL=https://你的域名
 WECHAT_MODE=wechat
 WECHAT_APP_ID=公众号 AppID
@@ -158,6 +159,16 @@ WECHAT_PAY_NOTIFY_URL=https://你的域名/api/pay/notify
 ```
 
 骨架目前会在真实支付资料未配齐时返回 `wechat_pay_not_configured`，不会假装真实支付成功。后续接正式支付时，需要在 `server/services/payments.js` 中补微信支付 v3 JSAPI 下单签名和平台回调验签。
+
+当 `NODE_ENV=production` 时，后端启动会校验生产配置。`PUBLIC_BASE_URL` 必须是 HTTPS；如果启用 `WECHAT_MODE=wechat`，必须配置公众号 AppID、AppSecret 和网页授权回调；如果启用 `WECHAT_PAY_MODE=wechat_jsapi`，必须配置商户号、API v3 密钥、私钥路径、证书序列号和支付回调地址。缺配置时服务会拒绝启动，并输出明确的缺失项。
+
+服务器代码部署可在服务器仓库目录外直接执行：
+
+```bash
+bash /home/ubuntu/kualian-h5/scripts/deploy-production.sh
+```
+
+脚本会依次执行 `git pull --ff-only`、`node scripts/build-dist.mjs`、同步 `dist/` 到 `/var/www/faceok`、安装 `deploy/nginx-faceok.conf`、`nginx -t`、重载 Nginx、重启并保存 PM2 进程。默认值可通过 `APP_DIR`、`WEB_ROOT`、`NGINX_SITE_NAME`、`PM2_APP`、`NODE_BIN` 环境变量覆盖。
 
 后端已经预留 `orders` 表，用于记录 7 天状态管理订单：
 

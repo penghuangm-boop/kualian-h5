@@ -27,6 +27,8 @@ const hasEnvExample = fs.existsSync(envExamplePath);
 const envExample = hasEnvExample ? fs.readFileSync(envExamplePath, "utf8") : "";
 const nginxDeployPath = path.join(root, "deploy/nginx-faceok.conf");
 const nginxDeployConfig = fs.existsSync(nginxDeployPath) ? fs.readFileSync(nginxDeployPath, "utf8") : "";
+const deployScriptPath = path.join(root, "scripts/deploy-production.sh");
+const deployScript = fs.existsSync(deployScriptPath) ? fs.readFileSync(deployScriptPath, "utf8") : "";
 const serverFiles = {
   index: path.join(root, "server/index.js"),
   config: path.join(root, "server/config.js"),
@@ -247,6 +249,7 @@ const failures = {
   missingEnvExample: hasMockApi
     ? hasEnvExample
       ? [
+      "NODE_ENV=development",
       "WECHAT_MODE=mock",
       "WECHAT_APP_ID=",
       "WECHAT_APP_SECRET=",
@@ -332,6 +335,28 @@ const failures = {
     "location ^~ /api/admin/",
     "proxy_pass http://127.0.0.1:4174/api/admin/"
   ].filter((snippet) => !nginxDeployConfig.includes(snippet)) : [],
+  missingProductionConfigValidation: hasMockApi
+    ? [
+      "validateProductionConfig",
+      "assertProductionConfig",
+      "PUBLIC_BASE_URL must use https:// in production.",
+      "WECHAT_APP_ID is required when WECHAT_MODE=wechat.",
+      "WECHAT_PAY_API_V3_KEY is required when WECHAT_PAY_MODE=wechat_jsapi.",
+      "WECHAT_PAY_NOTIFY_URL is required when WECHAT_PAY_MODE=wechat_jsapi.",
+      "Production configuration error"
+    ].filter((snippet) => !backendSource.includes(snippet))
+    : [],
+  missingDeployScript: buildDistJs ? [
+    "scripts/build-dist.mjs",
+    "/var/www/faceok",
+    "deploy/nginx-faceok.conf",
+    "nginx -t",
+    "systemctl reload nginx",
+    "pm2 restart",
+    "pm2 save",
+    "rsync",
+    "set -euo pipefail"
+  ].filter((snippet) => !deployScript.includes(snippet)) : [],
   collapseTypeCount: collapseTypeCount === 6 ? [] : [`expected 6 collapse face types, found ${collapseTypeCount}`],
   questionCount: questionCount === 10 ? [] : [`expected 10 questions, found ${questionCount}`],
   questionOrder: JSON.stringify(questionTitles) === JSON.stringify(expectedQuestionTitles)

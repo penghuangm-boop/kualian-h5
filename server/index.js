@@ -1,5 +1,5 @@
 const http = require("node:http");
-const { readServerConfig } = require("./config");
+const { assertProductionConfig, readServerConfig } = require("./config");
 const db = require("./db");
 const { sendJson } = require("./http");
 const { handleAdminRoutes } = require("./routes/admin");
@@ -49,6 +49,7 @@ function createServer() {
 
 function startServer(overrides = {}) {
   const config = { ...readServerConfig(), ...overrides };
+  assertProductionConfig(config);
   const server = createServer();
   server.listen(config.port, config.host, () => {
     console.log(`Kuailian production API running: http://${config.host}:${config.port}`);
