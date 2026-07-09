@@ -12,6 +12,10 @@ const files = [
   "admin.css",
   "admin.js",
   "config.js",
+  "privacy.html",
+  "terms.html",
+  "disclaimer.html",
+  "contact.html",
   "README.md"
 ];
 
@@ -41,6 +45,7 @@ function writeDeployReadme() {
 
 - H5：\`index.html\`
 - 后台原型：\`admin.html\`
+- 合规页面：\`privacy.html\`、\`terms.html\`、\`disclaimer.html\`、\`contact.html\`
 
 ## 包含
 
@@ -64,7 +69,7 @@ function writeDeployReadme() {
 2. 用微信内置浏览器打开首页，完整走一遍 10 题测评。
 3. 确认第 10 题后进入照片页。
 4. 确认报告页、7 天打卡、海报生成可用。
-5. 后台 \`admin.html\` 当前没有鉴权，正式公开前建议隐藏入口或加登录保护。
+5. 后台 \`admin.html\` 与 \`/api/admin/\` 需要由 Nginx Basic Auth 或同等访问控制保护。
 
 ## 数据说明
 

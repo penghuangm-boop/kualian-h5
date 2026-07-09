@@ -12,12 +12,21 @@ const js = fs.readFileSync(path.join(root, "app.js"), "utf8");
 const adminHtml = fs.readFileSync(path.join(root, "admin.html"), "utf8");
 const adminCss = fs.readFileSync(path.join(root, "admin.css"), "utf8");
 const adminJs = fs.readFileSync(path.join(root, "admin.js"), "utf8");
+const buildDistPath = path.join(root, "scripts/build-dist.mjs");
+const buildDistJs = fs.existsSync(buildDistPath) ? fs.readFileSync(buildDistPath, "utf8") : "";
+const legalPageFiles = ["privacy.html", "terms.html", "disclaimer.html", "contact.html"];
+const legalPages = Object.fromEntries(legalPageFiles.map((file) => {
+  const pagePath = path.join(root, file);
+  return [file, fs.existsSync(pagePath) ? fs.readFileSync(pagePath, "utf8") : ""];
+}));
 const mockApiPath = path.join(root, "mock-api.js");
 const hasMockApi = fs.existsSync(mockApiPath);
 const mockApiJs = hasMockApi ? fs.readFileSync(mockApiPath, "utf8") : "";
 const envExamplePath = path.join(root, ".env.example");
 const hasEnvExample = fs.existsSync(envExamplePath);
 const envExample = hasEnvExample ? fs.readFileSync(envExamplePath, "utf8") : "";
+const nginxDeployPath = path.join(root, "deploy/nginx-faceok.conf");
+const nginxDeployConfig = fs.existsSync(nginxDeployPath) ? fs.readFileSync(nginxDeployPath, "utf8") : "";
 const serverFiles = {
   index: path.join(root, "server/index.js"),
   config: path.join(root, "server/config.js"),
@@ -289,6 +298,40 @@ const failures = {
   missingMockApiWrapper: hasMockApi
     ? ["require(\"./server/index\")", "startServer"].filter((snippet) => !mockApiJs.includes(snippet))
     : [],
+  missingComplianceLinks: [
+    "privacy.html",
+    "terms.html",
+    "disclaimer.html",
+    "contact.html",
+    "ICP备案号：备案中",
+    "support@faceok.cn"
+  ].filter((snippet) => !html.includes(snippet)),
+  missingCompliancePages: legalPageFiles
+    .filter((file) => legalPages[file].length === 0)
+    .concat([
+      ["privacy.html", "隐私政策"],
+      ["privacy.html", "个人信息"],
+      ["privacy.html", "不识别身份"],
+      ["terms.html", "用户协议"],
+      ["terms.html", "非医疗诊断"],
+      ["disclaimer.html", "免责声明"],
+      ["disclaimer.html", "仅供参考"],
+      ["contact.html", "联系我们"],
+      ["contact.html", "support@faceok.cn"],
+      ["contact.html", "ICP备案号：备案中"]
+    ].filter(([file, snippet]) => !legalPages[file].includes(snippet)).map(([file, snippet]) => `${file}:${snippet}`)),
+  missingComplianceBuildEntries: buildDistJs
+    ? legalPageFiles.filter((file) => !buildDistJs.includes(`"${file}"`))
+    : [],
+  missingAdminProtectionTemplate: buildDistJs ? [
+    "auth_basic",
+    "auth_basic_user_file /etc/nginx/.htpasswd-faceok-admin;",
+    "location = /admin.html",
+    "location = /admin.js",
+    "location = /admin.css",
+    "location ^~ /api/admin/",
+    "proxy_pass http://127.0.0.1:4174/api/admin/"
+  ].filter((snippet) => !nginxDeployConfig.includes(snippet)) : [],
   collapseTypeCount: collapseTypeCount === 6 ? [] : [`expected 6 collapse face types, found ${collapseTypeCount}`],
   questionCount: questionCount === 10 ? [] : [`expected 10 questions, found ${questionCount}`],
   questionOrder: JSON.stringify(questionTitles) === JSON.stringify(expectedQuestionTitles)
