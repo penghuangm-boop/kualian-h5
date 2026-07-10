@@ -27,8 +27,12 @@ const hasEnvExample = fs.existsSync(envExamplePath);
 const envExample = hasEnvExample ? fs.readFileSync(envExamplePath, "utf8") : "";
 const nginxDeployPath = path.join(root, "deploy/nginx-faceok.conf");
 const nginxDeployConfig = fs.existsSync(nginxDeployPath) ? fs.readFileSync(nginxDeployPath, "utf8") : "";
+const nginxHttpsDeployPath = path.join(root, "deploy/nginx-faceok-https.conf");
+const nginxHttpsDeployConfig = fs.existsSync(nginxHttpsDeployPath) ? fs.readFileSync(nginxHttpsDeployPath, "utf8") : "";
 const deployScriptPath = path.join(root, "scripts/deploy-production.sh");
 const deployScript = fs.existsSync(deployScriptPath) ? fs.readFileSync(deployScriptPath, "utf8") : "";
+const httpsSetupScriptPath = path.join(root, "scripts/setup-https.sh");
+const httpsSetupScript = fs.existsSync(httpsSetupScriptPath) ? fs.readFileSync(httpsSetupScriptPath, "utf8") : "";
 const serverFiles = {
   index: path.join(root, "server/index.js"),
   config: path.join(root, "server/config.js"),
@@ -329,6 +333,7 @@ const failures = {
   missingAdminProtectionTemplate: buildDistJs ? [
     "auth_basic",
     "auth_basic_user_file /etc/nginx/.htpasswd-faceok-admin;",
+    "location ^~ /.well-known/acme-challenge/",
     "location = /admin.html",
     "location = /admin.js",
     "location = /admin.css",
@@ -357,6 +362,30 @@ const failures = {
     "rsync",
     "set -euo pipefail"
   ].filter((snippet) => !deployScript.includes(snippet)) : [],
+  missingHttpsTemplate: buildDistJs ? [
+    "listen 443 ssl http2;",
+    "listen 80;",
+    "return 301 https://$host$request_uri;",
+    "ssl_certificate /etc/letsencrypt/live/faceok.cn/fullchain.pem;",
+    "ssl_certificate_key /etc/letsencrypt/live/faceok.cn/privkey.pem;",
+    "location ^~ /.well-known/acme-challenge/",
+    "location ^~ /api/admin/",
+    "auth_basic_user_file /etc/nginx/.htpasswd-faceok-admin;",
+    "proxy_set_header X-Forwarded-Proto $scheme;",
+    "try_files $uri $uri/ /index.html;"
+  ].filter((snippet) => !nginxHttpsDeployConfig.includes(snippet)) : [],
+  missingHttpsSetupScript: buildDistJs ? [
+    "CERTBOT_EMAIL",
+    "certbot certonly --webroot",
+    "--agree-tos",
+    "--non-interactive",
+    "deploy/nginx-faceok.conf",
+    "deploy/nginx-faceok-https.conf",
+    "nginx -t",
+    "systemctl reload nginx",
+    "certbot renew --dry-run",
+    "set -euo pipefail"
+  ].filter((snippet) => !httpsSetupScript.includes(snippet)) : [],
   collapseTypeCount: collapseTypeCount === 6 ? [] : [`expected 6 collapse face types, found ${collapseTypeCount}`],
   questionCount: questionCount === 10 ? [] : [`expected 10 questions, found ${questionCount}`],
   questionOrder: JSON.stringify(questionTitles) === JSON.stringify(expectedQuestionTitles)

@@ -170,6 +170,14 @@ bash /home/ubuntu/kualian-h5/scripts/deploy-production.sh
 
 脚本会依次执行 `git pull --ff-only`、`node scripts/build-dist.mjs`、同步 `dist/` 到 `/var/www/faceok`、安装 `deploy/nginx-faceok.conf`、`nginx -t`、重载 Nginx、重启并保存 PM2 进程。默认值可通过 `APP_DIR`、`WEB_ROOT`、`NGINX_SITE_NAME`、`PM2_APP`、`NODE_BIN` 环境变量覆盖。
 
+ICP备案通过、域名能正常访问服务器后，可以签发 HTTPS 证书并切换到 443：
+
+```bash
+CERTBOT_EMAIL=你的邮箱 bash /home/ubuntu/kualian-h5/scripts/setup-https.sh
+```
+
+脚本会使用 `certbot certonly --webroot` 申请 `faceok.cn` 和 `www.faceok.cn` 证书，成功后安装 `deploy/nginx-faceok-https.conf`，把域名 HTTP 自动跳转到 HTTPS，同时保留公网 IP 的 HTTP 访问用于临时排查。首次正式执行前可加 `CERTBOT_STAGING=1` 走 Let's Encrypt 测试环境，确认链路没问题后再去掉。
+
 后端已经预留 `orders` 表，用于记录 7 天状态管理订单：
 
 ```text
