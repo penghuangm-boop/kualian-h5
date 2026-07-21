@@ -15,6 +15,7 @@ const adminJs = fs.readFileSync(path.join(root, "admin.js"), "utf8");
 const buildDistPath = path.join(root, "scripts/build-dist.mjs");
 const buildDistJs = fs.existsSync(buildDistPath) ? fs.readFileSync(buildDistPath, "utf8") : "";
 const legalPageFiles = ["privacy.html", "terms.html", "disclaimer.html", "contact.html"];
+const icpNumber = "浙ICP备2026055373号";
 const legalPages = Object.fromEntries(legalPageFiles.map((file) => {
   const pagePath = path.join(root, file);
   return [file, fs.existsSync(pagePath) ? fs.readFileSync(pagePath, "utf8") : ""];
@@ -310,7 +311,8 @@ const failures = {
     "terms.html",
     "disclaimer.html",
     "contact.html",
-    "ICP备案号：备案中",
+    icpNumber,
+    "https://beian.miit.gov.cn/",
     "support@faceok.cn"
   ].filter((snippet) => !html.includes(snippet)),
   missingCompliancePages: legalPageFiles
@@ -325,8 +327,12 @@ const failures = {
       ["disclaimer.html", "仅供参考"],
       ["contact.html", "联系我们"],
       ["contact.html", "support@faceok.cn"],
-      ["contact.html", "ICP备案号：备案中"]
+      ["contact.html", icpNumber],
+      ["contact.html", "https://beian.miit.gov.cn/"]
     ].filter(([file, snippet]) => !legalPages[file].includes(snippet)).map(([file, snippet]) => `${file}:${snippet}`)),
+  lingeringIcpPlaceholder: [html, ...Object.values(legalPages)].some((source) => source.includes("备案中"))
+    ? ["ICP备案号 should not say 备案中 after filing is approved"]
+    : [],
   missingComplianceBuildEntries: buildDistJs
     ? legalPageFiles.filter((file) => !buildDistJs.includes(`"${file}"`))
     : [],
