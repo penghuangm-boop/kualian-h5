@@ -59,7 +59,7 @@ function createWechatOAuthUrl(payload = {}) {
     appid: config.appId,
     redirect_uri: config.oauthRedirectUri,
     response_type: "code",
-    scope: payload.scope || "snsapi_base",
+    scope: payload.scope || "snsapi_userinfo",
     state
   });
   return {
@@ -69,7 +69,53 @@ function createWechatOAuthUrl(payload = {}) {
   };
 }
 
-function handleWechatCallback(url) {
+async function requestWechatJson(target) {
+  const response = await fetch(target);
+  const payload = await response.json();
+  if (!response.ok || payload.errcode) {
+    const code = payload.errcode ? `wechat_${payload.errcode}` : `http_${response.status}`;
+    throw new Error(code);
+  }
+  return payload;
+}
+
+async function exchangeWechatCode(config, code) {
+  const params = new URLSearchParams({
+    appid: config.appId,
+    secret: config.appSecret,
+    code,
+    grant_type: "authorization_code"
+  });
+  return requestWechatJson(`https://api.weixin.qq.com/sns/oauth2/access_token?${params.toString()}`);
+}
+
+async function fetchWechatUserInfo(accessTokenPayload) {
+  if (!accessTokenPayload.access_token || !accessTokenPayload.openid) {
+    throw new Error("wechat_oauth_missing_openid");
+  }
+  if (!String(accessTokenPayload.scope || "").includes("snsapi_userinfo")) {
+    return {
+      openid: accessTokenPayload.openid,
+      unionid: accessTokenPayload.unionid || null,
+      nickname: "微信用户",
+      avatarUrl: null
+    };
+  }
+  const params = new URLSearchParams({
+    access_token: accessTokenPayload.access_token,
+    openid: accessTokenPayload.openid,
+    lang: "zh_CN"
+  });
+  const userInfo = await requestWechatJson(`https://api.weixin.qq.com/sns/userinfo?${params.toString()}`);
+  return {
+    openid: userInfo.openid || accessTokenPayload.openid,
+    unionid: userInfo.unionid || accessTokenPayload.unionid || null,
+    nickname: userInfo.nickname || "微信用户",
+    avatarUrl: userInfo.headimgurl || null
+  };
+}
+
+async function handleWechatCallback(url) {
   const config = readWechatConfig();
   if (!config.oauthReady) {
     return {
@@ -78,19 +124,30 @@ function handleWechatCallback(url) {
       mode: "mock"
     };
   }
-  if (!url.searchParams.get("code")) {
+  const code = url.searchParams.get("code");
+  if (!code) {
     return {
       redirect: `${config.publicBaseUrl}/#home?wechat_error=missing_code`,
       user: null,
       mode: "wechat"
     };
   }
-  return {
-    redirect: `${config.publicBaseUrl}/#home?wechat_error=exchange_pending`,
-    user: null,
-    mode: "wechat",
-    error: "wechat_code_exchange_pending"
-  };
+  try {
+    const tokenPayload = await exchangeWechatCode(config, code);
+    const userInfo = await fetchWechatUserInfo(tokenPayload);
+    return {
+      redirect: `${config.publicBaseUrl}/#home?wechat_login=success`,
+      user: db.upsertWechatUser(userInfo),
+      mode: "wechat"
+    };
+  } catch (error) {
+    return {
+      redirect: `${config.publicBaseUrl}/#home?wechat_error=oauth_failed`,
+      user: null,
+      mode: "wechat",
+      error: error.message
+    };
+  }
 }
 
 function getSessionFromRequest(request) {

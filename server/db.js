@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const crypto = require("node:crypto");
 const { execFileSync } = require("node:child_process");
 const { readServerConfig } = require("./config");
 
@@ -113,6 +114,8 @@ function initDb() {
       id TEXT PRIMARY KEY,
       nickname TEXT NOT NULL,
       openid TEXT,
+      unionid TEXT,
+      avatar_url TEXT,
       login_type TEXT NOT NULL DEFAULT 'mock',
       stage TEXT NOT NULL DEFAULT 'new',
       note TEXT NOT NULL DEFAULT '',
@@ -173,6 +176,12 @@ function initDb() {
   if (!columnExists("users", "note")) {
     runSql("ALTER TABLE users ADD COLUMN note TEXT NOT NULL DEFAULT '';");
   }
+  if (!columnExists("users", "unionid")) {
+    runSql("ALTER TABLE users ADD COLUMN unionid TEXT;");
+  }
+  if (!columnExists("users", "avatar_url")) {
+    runSql("ALTER TABLE users ADD COLUMN avatar_url TEXT;");
+  }
   seedDemoReports();
 }
 
@@ -220,6 +229,8 @@ function normalizeUser(row) {
     id: row.id,
     nickname: row.nickname,
     openid: row.openid || null,
+    unionid: row.unionid || null,
+    avatarUrl: row.avatar_url || null,
     loginType: row.login_type,
     stage: row.stage || "new",
     note: row.note || "",
@@ -311,6 +322,38 @@ function mockLogin(payload = {}) {
     ON CONFLICT(id) DO UPDATE SET
       nickname = excluded.nickname,
       openid = COALESCE(users.openid, excluded.openid),
+      updated_at = CURRENT_TIMESTAMP;
+  `);
+  return getUser(userId);
+}
+
+function stableWechatUserId(openid) {
+  return `wechat-${crypto.createHash("sha256").update(String(openid)).digest("hex").slice(0, 16)}`;
+}
+
+function upsertWechatUser(payload = {}) {
+  if (!payload.openid) {
+    throw new Error("openid is required for wechat login");
+  }
+  const userId = payload.userId || stableWechatUserId(payload.openid);
+  const nickname = payload.nickname || "微信用户";
+  runSql(`
+    INSERT INTO users (id, nickname, openid, unionid, avatar_url, login_type, updated_at)
+    VALUES (
+      ${sql(userId)},
+      ${sql(nickname)},
+      ${sql(payload.openid)},
+      ${sql(payload.unionid || null)},
+      ${sql(payload.avatarUrl || null)},
+      ${sql("wechat")},
+      CURRENT_TIMESTAMP
+    )
+    ON CONFLICT(id) DO UPDATE SET
+      nickname = excluded.nickname,
+      openid = excluded.openid,
+      unionid = COALESCE(excluded.unionid, users.unionid),
+      avatar_url = COALESCE(excluded.avatar_url, users.avatar_url),
+      login_type = ${sql("wechat")},
       updated_at = CURRENT_TIMESTAMP;
   `);
   return getUser(userId);
@@ -494,6 +537,7 @@ module.exports = {
   updateOrderStatus,
   updatePhoto,
   updateUserMeta,
+  upsertWechatUser,
   writeConfig,
   writeEvent
 };
