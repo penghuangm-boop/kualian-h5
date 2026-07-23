@@ -25,7 +25,7 @@ db.initDb();
 
 const oauth = createWechatOAuthUrl({ state: "state-1" });
 assert.equal(oauth.mode, "wechat");
-assert.ok(oauth.loginUrl.includes("scope=snsapi_userinfo"));
+assert.ok(oauth.loginUrl.includes("scope=snsapi_base"));
 assert.ok(oauth.loginUrl.includes("appid=wx-test-app"));
 
 const requestedUrls = [];
@@ -37,21 +37,13 @@ global.fetch = async (target) => {
       json: async () => ({
         access_token: "oauth-token",
         openid: "openid-123",
-        scope: "snsapi_userinfo",
+        scope: "snsapi_base",
         unionid: "union-123"
       })
     };
   }
   if (String(target).includes("/sns/userinfo")) {
-    return {
-      ok: true,
-      json: async () => ({
-        openid: "openid-123",
-        nickname: "微信用户甲",
-        headimgurl: "https://thirdwx.qlogo.cn/avatar.jpg",
-        unionid: "union-123"
-      })
-    };
+    throw new Error("userinfo should not be requested for snsapi_base");
   }
   throw new Error(`unexpected fetch ${target}`);
 };
@@ -63,11 +55,12 @@ try {
   assert.equal(result.mode, "wechat");
   assert.equal(result.redirect, "https://faceok.cn/#home?wechat_login=success");
   assert.equal(result.user.openid, "openid-123");
-  assert.equal(result.user.nickname, "微信用户甲");
+  assert.equal(result.user.nickname, "微信用户");
   assert.equal(result.user.loginType, "wechat");
   assert.equal(result.user.unionid, "union-123");
-  assert.equal(result.user.avatarUrl, "https://thirdwx.qlogo.cn/avatar.jpg");
+  assert.equal(result.user.avatarUrl, null);
   assert.ok(requestedUrls.some((target) => target.includes("code=code-123")));
+  assert.ok(!requestedUrls.some((target) => target.includes("/sns/userinfo")));
 
   const stored = db.getUser(result.user.id);
   assert.equal(stored.openid, "openid-123");

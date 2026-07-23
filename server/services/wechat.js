@@ -59,7 +59,7 @@ function createWechatOAuthUrl(payload = {}) {
     appid: config.appId,
     redirect_uri: config.oauthRedirectUri,
     response_type: "code",
-    scope: payload.scope || "snsapi_userinfo",
+    scope: payload.scope || "snsapi_base",
     state
   });
   return {
